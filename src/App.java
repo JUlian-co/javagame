@@ -1,20 +1,17 @@
 import javax.swing.*;
 
 public class App {
-    public static void main(String[] args) throws Exception {
-        int boardWidth = 750;
-        int boardHeight = 250;
-
-        JFrame frame = new JFrame("Chrome Dinosaur");
-        frame.setSize(boardWidth, boardHeight);
+    public static void main(String[] args) {
+        JFrame frame = new JFrame("Chrome Dino");
+        frame.setSize(750, 250);
         frame.setLocationRelativeTo(null);
         frame.setResizable(false);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        ChromeDinosaur chromeDinosaur = new ChromeDinosaur();
-        frame.add(chromeDinosaur);
+        ChromeDinosaur game = new ChromeDinosaur();
+        frame.add(game);
         frame.pack();
-        chromeDinosaur.requestFocus();
+        game.requestFocus();
         frame.setVisible(true);
     }
 }

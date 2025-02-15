@@ -4,211 +4,182 @@ import java.util.ArrayList;
 import javax.swing.*;
 
 public class ChromeDinosaur extends JPanel implements ActionListener, KeyListener {
-    int boardWidth = 750;
-    int boardHeight = 250;
-
-    //images
-    Image dinosaurImg;
-    Image dinosaurDeadImg;
-    Image dinosaurJumpImg;
-    Image cactus1Img;
-    Image cactus2Img;
-    Image cactus3Img;
-
-    class Block {
-        int x;
-        int y;
-        int width;
-        int height;
-        Image img;
-
-        Block(int x, int y, int width, int height, Image img) {
+    // Spieleinstellungen
+    private final int BOARD_WIDTH = 750;
+    private final int BOARD_HEIGHT = 250;
+    private final int DINO_X = 50;
+    private final int JUMP_SPEED = -17;
+    private final int GAME_SPEED = -12;
+    
+    // Spielobjekte
+    private Dinosaur dino;
+    private ArrayList<Cactus> cacti;
+    
+    // spiel ereignisse
+    private boolean gameOver;
+    private int score;
+    private Timer gameLoop;
+    private Timer cactusSpawner;
+    
+    // Innere Klasse für game assetss
+    private class GameObject {
+        int x, y, width, height;
+        Image image;
+        
+        GameObject(int x, int y, int width, int height, String imagePath) {
             this.x = x;
             this.y = y;
             this.width = width;
             this.height = height;
-            this.img = img;
+            this.image = new ImageIcon(getClass().getResource(imagePath)).getImage();
+        }
+        
+        boolean collidesWith(GameObject other) {
+            return x < other.x + other.width &&
+                   x + width > other.x &&
+                   y < other.y + other.height &&
+                   y + height > other.y;
         }
     }
-
-    //dinosaur
-    int dinosaurWidth = 88;
-    int dinosaurHeight = 94;
-    int dinosaurX = 50;
-    int dinosaurY = boardHeight - dinosaurHeight;
-
-    Block dinosaur;
-
-    //cactus
-    int cactus1Width = 34;
-    int cactus2Width = 69;
-    int cactus3Width = 102;
-
-    int cactusHeight = 70;
-    int cactusX = 700;
-    int cactusY = boardHeight - cactusHeight;
-    ArrayList<Block> cactusArray;
-
-    //physics
-    int velocityX = -12; //cactus moving left speed
-    int velocityY = 0; //dinosaur jump speed
-    int gravity = 1;
-
-    boolean gameOver = false;
-    int score = 0;
-
-    Timer gameLoop;
-    Timer placeCactusTimer;
-
+    
+    // Dinosaurier Klasse
+    private class Dinosaur extends GameObject {
+        int velocityY;
+        Image runImage, jumpImage, deadImage;
+        
+        Dinosaur() {
+            super(DINO_X, BOARD_HEIGHT - 94, 88, 94, "./img/dino-run.gif");
+            runImage = image;
+            jumpImage = new ImageIcon(getClass().getResource("./img/dino-jump.png")).getImage();
+            deadImage = new ImageIcon(getClass().getResource("./img/dino-dead.png")).getImage();
+        }
+        
+        void jump() {
+            if (y == BOARD_HEIGHT - height) {
+                velocityY = JUMP_SPEED;
+                image = jumpImage;
+            }
+        }
+        
+        void update() {
+            velocityY += 1; // Gravity
+            y += velocityY;
+            
+            if (y > BOARD_HEIGHT - height) {
+                y = BOARD_HEIGHT - height;
+                velocityY = 0;
+                image = runImage;
+            }
+        }
+    }
+    
+    // Kaktus  Klasse
+    private class Cactus extends GameObject {
+        Cactus(int type) {
+            super(BOARD_WIDTH, BOARD_HEIGHT - 70, 
+                  type == 1 ? 34 : type == 2 ? 69 : 102, 
+                  70, 
+                  "./img/cactus" + type + ".png");
+        }
+        
+        void move() {
+            x += GAME_SPEED;
+        }
+    }
+    
     public ChromeDinosaur() {
-        setPreferredSize(new Dimension(boardWidth, boardHeight));
+        setPreferredSize(new Dimension(BOARD_WIDTH, BOARD_HEIGHT));
         setBackground(Color.lightGray);
         setFocusable(true);
         addKeyListener(this);
-
-        dinosaurImg = new ImageIcon(getClass().getResource("./img/dino-run.gif")).getImage();
-        dinosaurDeadImg = new ImageIcon(getClass().getResource("./img/dino-dead.png")).getImage();
-        dinosaurJumpImg = new ImageIcon(getClass().getResource("./img/dino-jump.png")).getImage();
-        cactus1Img = new ImageIcon(getClass().getResource("./img/cactus1.png")).getImage();
-        cactus2Img = new ImageIcon(getClass().getResource("./img/cactus2.png")).getImage();
-        cactus3Img = new ImageIcon(getClass().getResource("./img/cactus3.png")).getImage();
-
-        //dinosaur
-        dinosaur = new Block(dinosaurX, dinosaurY, dinosaurWidth, dinosaurHeight, dinosaurImg);
-        //cactus
-        cactusArray = new ArrayList<Block>();
-
-        //game timer
-        gameLoop = new Timer(1000/60, this); //1000/60 = 60 frames per 1000ms (1s), update
+        
+        initGame();
+    }
+    
+    private void initGame() {
+        dino = new Dinosaur();
+        cacti = new ArrayList<>();
+        gameOver = false;
+        score = 0;
+        
+        gameLoop = new Timer(1000/60, this);
         gameLoop.start();
-
-        //place cactus timer
-        placeCactusTimer = new Timer(1500, new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                placeCactus();
+        
+        cactusSpawner = new Timer(1500, e -> spawnCactus());
+        cactusSpawner.start();
+    }
+    
+    private void spawnCactus() {
+        if (!gameOver) {
+            double chance = Math.random();
+            if (chance > 0.5) {
+                cacti.add(new Cactus((int)(Math.random() * 3) + 1));
             }
-        });
-        placeCactusTimer.start();
-    }
-
-    void placeCactus() {
-        if (gameOver) {
-            return;
-        }
-
-        double placeCactusChance = Math.random(); //0 - 0.999999
-        if (placeCactusChance > .90) { //10% you get cactus3
-            Block cactus = new Block(cactusX, cactusY, cactus3Width, cactusHeight, cactus3Img);
-            cactusArray.add(cactus);
-        } else if (placeCactusChance > .70) { //20% you get cactus2
-            Block cactus = new Block(cactusX, cactusY, cactus2Width, cactusHeight, cactus2Img);
-            cactusArray.add(cactus);
-        } else if (placeCactusChance > .50) { //20% you get cactus1
-            Block cactus = new Block(cactusX, cactusY, cactus1Width, cactusHeight, cactus1Img);
-            cactusArray.add(cactus);
-        }
-
-        if (cactusArray.size() > 10) {
-            cactusArray.remove(0); //remove the first cactus from ArrayList
+            if (cacti.size() > 10) {
+                cacti.remove(0);
+            }
         }
     }
-
-    public void paintComponent(Graphics g) {
+    
+    @Override
+    protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        draw(g);
-    }
-
-    public void draw(Graphics g) {
-        //dinosaur
-        g.drawImage(dinosaur.img, dinosaur.x, dinosaur.y, dinosaur.width, dinosaur.height, null);
-
-        //cactus
-        for (int i = 0; i < cactusArray.size(); i++) {
-            Block cactus = cactusArray.get(i);
-            g.drawImage(cactus.img, cactus.x, cactus.y, cactus.width, cactus.height, null);
+        
+        // Dinosaurier
+        g.drawImage(dino.image, dino.x, dino.y, dino.width, dino.height, null);
+        
+        // Kaktus
+        for (Cactus cactus : cacti) {
+            g.drawImage(cactus.image, cactus.x, cactus.y, cactus.width, cactus.height, null);
         }
-
-        //score
-        g.setColor(Color.black);
+        
+        // Score
         g.setFont(new Font("Courier", Font.PLAIN, 32));
-        if (gameOver) {
-            g.drawString("Game Over: " + String.valueOf(score), 10, 35);
-        } else {
-            g.drawString(String.valueOf(score), 10, 35);
-        }
+        g.drawString(gameOver ? "Game Over: " + score : String.valueOf(score), 10, 35);
     }
-
-    public void move() {
-        //dinosaur
-        velocityY += gravity;
-        dinosaur.y += velocityY;
-
-        if (dinosaur.y > dinosaurY) { //stop the dinosaur from falling past the ground
-            dinosaur.y = dinosaurY;
-            velocityY = 0;
-            dinosaur.img = dinosaurImg;
-        }
-
-        //cactus
-        for (int i = 0; i < cactusArray.size(); i++) {
-            Block cactus = cactusArray.get(i);
-            cactus.x += velocityX;
-
-            if (collision(dinosaur, cactus)) {
-                gameOver = true;
-                dinosaur.img = dinosaurDeadImg;
+    
+    private void updateGame() {
+        if (!gameOver) {
+            dino.update();
+            
+            for (Cactus cactus : cacti) {
+                cactus.move();
+                if (cactus.collidesWith(dino)) {
+                    gameOver = true;
+                    dino.image = dino.deadImage;
+                    stopGame();
+                }
             }
+            
+            score++;
         }
-
-        //score
-        score++;
     }
-
-    boolean collision(Block a, Block b) {
-        return a.x < b.x + b.width &&   //a's top left corner doesn't reach b's top right corner
-               a.x + a.width > b.x &&   //a's top right corner passes b's top left corner
-               a.y < b.y + b.height &&  //a's top left corner doesn't reach b's bottom left corner
-               a.y + a.height > b.y;    //a's bottom left corner passes b's top left corner
+    
+    private void stopGame() {
+        gameLoop.stop();
+        cactusSpawner.stop();
     }
-
-
+    
     @Override
     public void actionPerformed(ActionEvent e) {
-        move();
+        updateGame();
         repaint();
-        if (gameOver) {
-            placeCactusTimer.stop();
-            gameLoop.stop();
-        }
     }
-
+    
     @Override
     public void keyPressed(KeyEvent e) {
         if (e.getKeyCode() == KeyEvent.VK_SPACE) {
-            // System.out.println("JUMP!");
-            if (dinosaur.y == dinosaurY) {
-                velocityY = -17;
-                dinosaur.img = dinosaurJumpImg;
-            }
-            
             if (gameOver) {
-                //restart game by resetting conditions
-                dinosaur.y = dinosaurY;
-                dinosaur.img = dinosaurImg;
-                velocityY = 0;
-                cactusArray.clear();
-                score = 0;
-                gameOver = false;
-                gameLoop.start();
-                placeCactusTimer.start();
+                initGame();
+            } else {
+                dino.jump();
             }
         }
     }
-
+    
     @Override
     public void keyTyped(KeyEvent e) {}
-
+    
     @Override
     public void keyReleased(KeyEvent e) {}
 }
